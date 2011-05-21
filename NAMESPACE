@@ -1,0 +1,2 @@
+export("irlba")
+importFrom("Matrix","crossprod")

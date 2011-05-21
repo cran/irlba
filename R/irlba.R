@@ -9,9 +9,6 @@
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
 #
-#  A copy of the GNU General Public License is available at in the
-#  'inst' subdirectory of this package.
-#
 # irlba: A fast and memory-efficient method for computing a few
 # approximate signular values and singular vectors of large matrices.
 #
@@ -27,8 +24,7 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
 # ---------------------------------------------------------------------
 # Check input parameters
 # ---------------------------------------------------------------------
-  eps <- 1
-  while (1+eps != 1) eps=eps/2; eps=2*eps
+  eps <- .Machine$double.eps
 # Profiling option
   options(digits.secs=3)
   m <- nrow(A)
@@ -116,7 +112,7 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
 # ---------------------------------------------------------------------
 
 # Euclidean norm
-  norm <- function (x) return(as.numeric(sqrt(crossprod(x))))
+  norm2 <- function (x) return(as.numeric(sqrt(crossprod(x))))
 
 # Orthogonalize vectors Y against vectors X. Y and X must be R matrix
 # objects (they must have a dim attribute).
@@ -179,7 +175,7 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
 # ---------------------------------------------------------------------
     j <- 1
 #   Normalize starting vector:
-    if (iter==1) V[,1] <- V[,1, drop=FALSE]/norm(V[,1, drop=FALSE]) 
+    if (iter==1) V[,1] <- V[,1, drop=FALSE]/norm2(V[,1, drop=FALSE]) 
     else j <- k + 1
 
 #   Compute W=AV (the use of as.matrix here converts Matrix class objects)
@@ -201,13 +197,13 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
       W[,j] <- orthog (W[,j, drop=FALSE], W[,1:j-1, drop=FALSE])
     }
 
-    S <- norm(W[,j, drop=FALSE])
-#   Check for linearly-dependent vectors
+    S <- norm2(W[,j, drop=FALSE])
+#   Check for linearly dependent vectors
     if ((S < SVTol) && (j==1)) stop ("Starting vector near the null space")
     if (S < SVTol) {
       W[,j] <- rnorm(nrow(W))
       W[,j] <- orthog(W[,j, drop=FALSE],W[,1:j-1, drop=FALSE])
-      W[,j] <- W[,j, drop=FALSE]/norm(W[,j, drop=FALSE])
+      W[,j] <- W[,j, drop=FALSE]/norm2(W[,j, drop=FALSE])
       S <- 0 
     }
     else W[,j] <- W[,j, drop=FALSE]/S
@@ -232,12 +228,12 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
       F <- orthog(F,V[,1:j, drop=FALSE])
 
       if (j+1 <= m_b) {
-        R <- norm(F)
+        R <- norm2(F)
 #       Check for linear dependence
         if (R<=SVTol) {
           F <- matrix(rnorm(dim(V)[1]),dim(V)[1],1)
           F <- orthog(F, V[,1:j, drop=FALSE])
-          V[,j+1] <- F/norm(F)
+          V[,j+1] <- F/norm2(F)
           R <- 0 
         }
         else V[,j+1] <- F/R
@@ -266,11 +262,11 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
 #       Full reorthogonalization of W
         if (iter==1 || reorth==2)
           W[,j+1] <- orthog(W[,j+1, drop=FALSE],W[,1:j, drop=FALSE])
-        S <- norm(W[,j+1, drop=FALSE])
+        S <- norm2(W[,j+1, drop=FALSE])
         if (S<=SVTol) {
           W[,j+1] <- rnorm(nrow(W))
           W[,j+1] <- orthog(W[,j+1, drop=FALSE],W[,1:j, drop=FALSE])
-          W[,j+1] <- W[,j+1, drop=FALSE]/norm(W[,j+1, drop=FALSE])
+          W[,j+1] <- W[,j+1, drop=FALSE]/norm2(W[,j+1, drop=FALSE])
           S <- 0
         }
         else W[,j+1] <- W[,j+1, drop=FALSE]/S
@@ -287,7 +283,7 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
 # ---------------------------------------------------------------------
 
     Bsz <- nrow(B)
-    R_F <- norm(F)
+    R_F <- norm2(F)
     F <- F/R_F
 #   Compute singular triplets of B. Expect svd to return s.v.s in order
 #   from largest to smallest.
@@ -384,5 +380,5 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
     u <- u[,reverse]
     v <- v[,reverse]
   }
-  return (list(d=d, u=u, v=v,iter=iter))
+  return (list(d=d, u=u, v=v, iter=iter,mprod=mprod))
 }

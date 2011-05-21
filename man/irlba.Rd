@@ -35,6 +35,7 @@ irlba(A, nu = 5, nv = 5, adjust = 3, aug = "ritz", sigma = "ls", maxit = 1000, m
   \item{u}{nu approximate left singular vectors}
   \item{v}{nv approximate right singular vectors}
   \item{iter}{The number of Lanczos iterations carried out}
+  \item{mprod}{The total number of matrix vector products carried out}
 }
 \details{
 The syntax of \code{irlba} largely conforms to \code{svd}, with an
@@ -46,7 +47,7 @@ specified singular vectors \code{nu} and \code{nv}.
 }
 \references{"Augmented Implicitly Restarted Lanczos Bidiagonalization Methods",
      J. Baglama and L. Reichel, SIAM J. Sci. Comput. 2005.  }
-\author{ Adapted for R by B. W. Lewis <Bryan@revolution-computing.com>}
+\author{ Adapted for R by B. W. Lewis <blewis@illposed.net>}
 \examples{
 A <- matrix(runif(100*100),100,100)
 S <- irlba (A)
