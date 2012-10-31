@@ -17,7 +17,7 @@
 # J. Baglama and L. Reichel, SIAM J. Sci. Comput. 2005.
 
 `irlba` <-
-function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls", 
+function (A, nu=5, nv=5, adjust=3, aug=c("ritz","harm"), sigma=c("ls","ss"), 
                    maxit=1000, m_b=20, reorth=2, tol=1e-6, V=NULL,
                    matmul=NULL)
 {
@@ -31,6 +31,8 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
   n <- ncol(A)
   k <- max(nu,nv)
   interchange <- FALSE
+  sigma = match.arg(sigma)
+  aug   = match.arg(aug)
 # Interchange dimensions m,n so that dim(A'A) = min(m,n) when seeking
 # the smallest singular values. This avoids finding zero smallest 
 # singular values.
@@ -98,7 +100,7 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
                             # B est. ||A||_2
   Smin <- NULL               # Min value of all computed singular values of
                             # B est. cond(A)
-  SVTol <- min(sqrteps,tol)  # Tolerance for singular vector convergence
+  SVTol <- max(sqrteps,tol)  # Tolerance for singular vector convergence
   S_B <- NULL                # Singular values of B
   U_B <- NULL                # Left singular vectors of B
   V_B <- NULL                # Right singular vectors of B
@@ -182,7 +184,7 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
     if(!is.null(matmul)) {
 #     User-specified matrix multiply function
       if(interchange)
-        W[,j] <- t(matmul(V[,j,drop=FALSE], A, transpose=TRUE))
+        W[,j] <- matmul(A, V[,j,drop=FALSE], transpose=TRUE)
       else
         W[,j] <- matmul(A, V[,j,drop=FALSE])
     }
@@ -194,7 +196,7 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
 
 #   Orthogonalize
     if (iter != 1) {
-      W[,j] <- orthog (W[,j, drop=FALSE], W[,1:j-1, drop=FALSE])
+      W[,j] <- orthog (W[,j, drop=FALSE], W[,1:(j-1), drop=FALSE])
     }
 
     S <- norm2(W[,j, drop=FALSE])
@@ -202,7 +204,7 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
     if ((S < SVTol) && (j==1)) stop ("Starting vector near the null space")
     if (S < SVTol) {
       W[,j] <- rnorm(nrow(W))
-      W[,j] <- orthog(W[,j, drop=FALSE],W[,1:j-1, drop=FALSE])
+      W[,j] <- orthog(W[,j, drop=FALSE],W[,1:(j-1), drop=FALSE])
       W[,j] <- W[,j, drop=FALSE]/norm2(W[,j, drop=FALSE])
       S <- 0 
     }
@@ -215,7 +217,7 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
         if(interchange)
           F <- matmul(A, W[,j,drop=FALSE])
         else
-          F <- t(matmul(W[,j,drop=FALSE], A, transpose=TRUE))
+          F <- matmul(A, W[,j,drop=FALSE], transpose=TRUE)
       }
       else{
         if (interchange) F <- as.matrix(A %*% W[,j, drop=FALSE])
@@ -245,7 +247,7 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
         if(!is.null(matmul)) {
 #         User-specified matrix multiply function
           if(interchange)
-            W[,j+1] <- t(matmul(V[,j+1,drop=FALSE],A, transpose=TRUE))
+            W[,j+1] <- matmul(A, V[,j+1,drop=FALSE], transpose=TRUE)
           else
             W[,j+1] <- matmul(A, V[,j+1,drop=FALSE])
         }
@@ -330,7 +332,9 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
 #   Compute the starting vectors and first block of B[1:k,1:(k+1), drop=FALSE]
     if (aug=="harm") {
 #     Update the SVD of B to be the svd of [B ||F||E_m]
-      Bsvd2 <- svd (cbind (diag (Bsvd$d), t (R)))
+      Bsvd2.d <- Bsvd$d
+      Bsvd2.d <- diag(Bsvd2.d, nrow=length(Bsvd2.d))
+      Bsvd2 <- svd (cbind (Bsvd2.d, t (R)))
       if (sigma=="ss") {
         jj <- seq (ncol (Bsvd2$u), 1, by=-1)
         Bsvd2$u <- Bsvd2$u[,jj]
@@ -352,12 +356,12 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
 
 #     Update and compute the k x k+1 part of B
       UT <- t(R[1:(k+1), 1:k, drop=FALSE] + R[,k+1,drop=FALSE] %*% V_B_last)
-      B <- diag(Bsvd$d[1:k]) %*% (UT*upper.tri(UT,diag=TRUE))
+      B <- diag(Bsvd$d[1:k],nrow=k) %*% (UT*upper.tri(UT,diag=TRUE))
     }
     else {
 #     Use the Ritz vectors
       V[,1:(k + dim(F)[2])] <- cbind(V[,1:(dim(Bsvd$v)[1]), drop=FALSE] %*% Bsvd$v[,1:k, drop=FALSE], F)
-      B <- cbind( diag(Bsvd$d[1:k, drop=FALSE]), R[1:k, drop=FALSE])
+      B <- cbind( diag(Bsvd$d[1:k],nrow=k), R[1:k, drop=FALSE])
     }
 
 #   Update the left approximate singular vectors
@@ -377,8 +381,8 @@ function (A, nu=5, nv=5, adjust=3, aug="ritz", sigma="ls",
   if(sigma=="ss") {
     reverse <- seq(length(d),1)
     d <- d[reverse]
-    u <- u[,reverse]
-    v <- v[,reverse]
+    u <- u[,reverse,drop=FALSE]
+    v <- v[,reverse,drop=FALSE]
   }
-  return (list(d=d, u=u, v=v, iter=iter,mprod=mprod))
+  return (list(d=d, u=u[,1:nu,drop=FALSE], v=v[,1:nv,drop=FALSE], iter=iter,mprod=mprod))
 }

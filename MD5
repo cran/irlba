@@ -1,7 +1,7 @@
-d942e45345a58e597e081802849e8fa3 *DESCRIPTION
+6b8bf1d40ea1c0f5f1bac4d1b0581861 *DESCRIPTION
 eaf9eac1851fb1c694d0f2eac8dd86ab *NAMESPACE
-bcdd37e2ef0e5a06e4c529e876156003 *NEWS
-8455959c5722931cce01dfc772410ac2 *R/irlba.R
+c1b933c66148de6ac1ba0381910808ec *NEWS
+19532cf492ffb706c15b3d8dc3a6ca0d *R/irlba.R
 8403a0b4d4b0d71ded31182b0cd8189b *inst/doc/irlba.Rnw
-819cfd3883d6e916652a5c9b07d6ed04 *inst/doc/irlba.pdf
-3fa5578f4275443072dbb7f7736aa60c *man/irlba.Rd
+5ce9806cdf1d7f10edada0e9e112cb83 *inst/doc/irlba.pdf
+f3133e0446a2b7e24f3a69dada9d5074 *man/irlba.Rd
