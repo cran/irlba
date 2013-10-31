@@ -48,8 +48,8 @@ function (A, nu=5, nv=5, adjust=3, aug=c("ritz","harm"), sigma=c("ls","ss"),
 # only an initial value;
   k_org <- k;
   k <- k + adjust;
-  if (k<=0)  stop ("k must be positive")
-  if (k>min(m,n)) stop ("k must be less than min(m,n)+adjust")
+  if (k<=0)  stop ("max(nu,nv)+adjust must be positive")
+  if (k>min(m,n)) stop ("max(nu,nv) must be less than min(nrow(A),ncol(A))")
   if (m_b<=1) stop ("m_b must be greater than 1")
   if (tol<0) stop ("tol must be non-negative")
   if (maxit<=0) stop ("maxit must be positive")
@@ -97,9 +97,9 @@ function (A, nu=5, nv=5, adjust=3, aug=c("ritz","harm"), sigma=c("ls","ss"),
   R_F <- NULL                # 2-norm of residual vector F
   sqrteps <- sqrt(eps)       #
   Smax <- 1                  # Max value of all computed singular values of
-                            # B est. ||A||_2
+                             # B est. ||A||_2
   Smin <- NULL               # Min value of all computed singular values of
-                            # B est. cond(A)
+                             # B est. cond(A)
   SVTol <- max(sqrteps,tol)  # Tolerance for singular vector convergence
   S_B <- NULL                # Singular values of B
   U_B <- NULL                # Left singular vectors of B

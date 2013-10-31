@@ -1,2 +1,2 @@
 export("irlba")
-importFrom("Matrix","crossprod")
+importFrom("Matrix",crossprod)

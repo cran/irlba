@@ -8,7 +8,9 @@ matrix using a method of Baglama and Reichel.  It is a fast and
 memory-efficient way to compute a partial SVD.
 }
 \usage{
-irlba(A, nu = 5, nv = 5, adjust = 3, aug = c("ritz","harm"), sigma = c("ls","ss"), maxit = 1000, m_b = 20, reorth = 2, tol = 1e-06, V = NULL, matmul = NULL)
+irlba(A, nu = 5, nv = 5, adjust = 3, aug = c("ritz","harm"),
+      sigma = c("ls","ss"), maxit = 1000, m_b = 20, reorth = 2,
+      tol = 1e-06, V = NULL, matmul = NULL)
 }
 \arguments{
   \item{A}{A double-precision real or complex matrix or real sparse matrix}
