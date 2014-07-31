@@ -49,7 +49,7 @@ function (A, nu=5, nv=5, adjust=3, aug=c("ritz","harm"), sigma=c("ls","ss"),
   k_org <- k;
   k <- k + adjust;
   if (k<=0)  stop ("max(nu,nv)+adjust must be positive")
-  if (k>min(m,n)) stop ("max(nu,nv) must be less than min(nrow(A),ncol(A))")
+  if (k>min(m,n)) stop ("max(nu,nv)+adjust must be less than or equal to min(nrow(A),ncol(A))")
   if (m_b<=1) stop ("m_b must be greater than 1")
   if (tol<0) stop ("tol must be non-negative")
   if (maxit<=0) stop ("maxit must be positive")
