@@ -13,7 +13,8 @@
 #' @param work working subspace dimension, larger values can speed convergence at the cost of more memory use.
 #' @param reorth if \code{TRUE}, apply full reorthogonalization to both SVD bases, otherwise
 #'   only apply reorthogonalization to the right SVD basis vectors; the latter case is cheaper per
-#'   iteration but, overall, may require more iterations for convergence.
+#'   iteration but, overall, may require more iterations for convergence. Always set to \code{TRUE}
+#'   when \code{fastpath=TRUE} (see below).
 #' @param tol convergence is determined when \eqn{\|AV - US\| < tol\|A\|}{||AV - US|| < tol*||A||},
 #'   where the spectral norm ||A|| is approximated by the
 #'   largest estimated singular value, and U, V, S are the matrices corresponding
@@ -23,7 +24,9 @@
 #'   to restart the algorithm from where it left off (see the notes).
 #' @param right_only logical value indicating return only the right singular vectors
 #'  (\code{TRUE}) or both sets of vectors (\code{FALSE}). The right_only option can be
-#'  cheaper to compute and use much less memory when \code{nrow(A) >> ncol(A)}.
+#'  cheaper to compute and use much less memory when \code{nrow(A) >> ncol(A)} but note
+#'  that \code{right_only = TRUE} sets \code{fastpath = FALSE} (only use this option
+#'  for really large problems that run out of memory).
 #' @param verbose logical value that when \code{TRUE} prints status messages during the computation.
 #' @param scale optional column scaling vector whose values divide each column of \code{A};
 #'   must be as long as the number of columns of \code{A} (see notes).
@@ -35,7 +38,7 @@
 #' @param dv DEPRECATED optional subspace deflation vector (see notes).
 #' @param shift optional shift value (square matrices only, see notes).
 #' @param mult optional custom matrix multiplication function (default is \code{\%*\%}, see notes).
-#' @param fastpath try a fast C algorithm implementation if possible; set \code{fastpath=FALSE} to use the reference R implementation.
+#' @param fastpath try a fast C algorithm implementation if possible; set \code{fastpath=FALSE} to use the reference R implementation. See notes.
 #'
 #' @return
 #' Returns a list with entries:
@@ -86,10 +89,13 @@
 #' Specify an optional alternative matrix multiplication operator in the
 #' \code{mult} parameter. \code{mult} must be a function of two arguments,
 #' and must handle both cases where one argument is a vector and the other
-#' a matrix. See the examples.
+#' a matrix. See the examples and
+#' \code{demo("custom_matrix_multiply", package="irlba")} for an 
+#' alternative approach.
 #'
 #' Use the \code{v} option to supply a starting vector for the iterative
-#' method. A random vector is used by default. Optionally set \code{v} to
+#' method. A random vector is used by default (precede with \code{set.seed()} to
+#' for reproducibility). Optionally set \code{v} to
 #' the output of a previous run of \code{irlba} to restart the method, adding
 #' additional singular values/vectors without recomputing the solution
 #' subspace. See the examples.
@@ -110,6 +116,10 @@
 #' }
 #' The function might return an error for several reasons including a situation when the starting
 #' vector \code{v} is near the null space of the matrix. In that case, try a different \code{v}.
+#'
+#' The \code{fastpath=TRUE} option only supports real-valued matrices and sparse matrices
+#' of type \code{dgCMatrix} (for now). Other problems fall back to the reference
+#' R implementation.
 #'
 #' @references
 #' Augmented Implicitly Restarted Lanczos Bidiagonalization Methods, J. Baglama and L. Reichel, SIAM J. Sci. Comput. 2005.
@@ -202,7 +212,7 @@ function (A,                     # data matrix
   {
     if (deflate) stop("the center parameter can't be specified together with deflation parameters")
     if (length(center) != ncol(A)) stop("center must be a vector of length ncol(A)")
-    if (fastpath) du <- NULL
+    if (fastpath && ! right_only) du <- NULL
     else du <- 1
     ds <- 1
     dv <- center
@@ -244,7 +254,8 @@ function (A,                     # data matrix
   if (right_only)
   {
     w_dim <- 1
-    work <- min(min(m, n), work + 10 ) # typically need this to help convergence
+    work <- min(min(m, n), work + 20 ) # typically need this to help convergence
+    fastpath <- FALSE
   }
 
   if (verbose)
@@ -254,8 +265,7 @@ function (A,                     # data matrix
 # Check for tiny problem, use standard SVD in that case. Make definition of 'tiny' larger?
   if (min(m, n) < 6)
   {
-    if (verbose) warning("Tiny problem detected, using standard `svd` function.")
-    algorithm = "svd"
+    if (verbose) message ("Tiny problem detected, using standard `svd` function.")
     if (!missing(scale)) A <- A / scale
     if (!missing(shift)) A <- A + diag(shift)
     if (deflate)
@@ -270,13 +280,25 @@ function (A,                     # data matrix
 
 # Try to use the fast C-language code path
   if (deflate) fastpath <- fastpath && is.null(du)
+# Only dgCMatrix supported by fastpath for now
+  if ("Matrix" %in% attributes(class(A)) && ! ("dgCMatrix" %in% class(A)))
+  {
+    fastpath <- FALSE
+  }
+# Check for custom class
+  if ("matrix" %in% attributes(A)$.S3Class && ! ("matrix" %in% class(A)))
+  {
+    fastpath <- FALSE
+  }
   if (fastpath && missingmult && !iscomplex && !right_only)
   {
     RESTART <- 0
     RV <- RW <- RS <- NULL
     if (is.null(v))
+    {
       v <- rnorm(n)
-    else if (is.list(v))  # restarted case
+      if (verbose) message("Initializing starting vector v with samples from standard normal distribution.\nUse `set.seed` first for reproducibility.")
+    } else if (is.list(v))  # restarted case
     {
       if (is.null(v$v) || is.null(v$d) || is.null(v$u)) stop("restart requires left and right singular vectors")
       if (max(nu, nv) <= min(ncol(v$u), ncol(v$v))) return(v) # Nothing to do!
@@ -328,7 +350,7 @@ function (A,                     # data matrix
                 "linear dependency encountered")
     erridx <- abs(ans[[6]])
     if (erridx > 1)
-      warning("fast code path error ", errors[erridx], "; re-trying with fastpath=FALSE.")
+      warning("fast code path error ", errors[erridx], "; re-trying with fastpath=FALSE.", immediate.=TRUE)
   }
 
 # Allocate memory for W and F:
@@ -449,8 +471,8 @@ function (A,                     # data matrix
 
     S <- norm2(W[, j_w, drop=FALSE])
 #   Check for linearly dependent vectors
-    if (S < eps2 && j == 1) stop("starting vector near the null space")
-    if (S < eps2)
+    if (is.na(S) || S < eps2 && j == 1) stop("starting vector near the null space")
+    if (is.na(S) || S < eps2)
     {
       W[, j_w] <- rnorm(nrow(W))
       if (w_dim > 1) W[, j] <- orthog(W[, j], W[, 1:(j - 1)])

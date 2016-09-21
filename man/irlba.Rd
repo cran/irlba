@@ -22,7 +22,8 @@ irlba(A, nv = 5, nu, maxit = 1000, work = nv + 7, reorth = TRUE,
 
 \item{reorth}{if \code{TRUE}, apply full reorthogonalization to both SVD bases, otherwise
 only apply reorthogonalization to the right SVD basis vectors; the latter case is cheaper per
-iteration but, overall, may require more iterations for convergence.}
+iteration but, overall, may require more iterations for convergence. Always set to \code{TRUE}
+when \code{fastpath=TRUE} (see below).}
 
 \item{tol}{convergence is determined when \eqn{\|AV - US\| < tol\|A\|}{||AV - US|| < tol*||A||},
 where the spectral norm ||A|| is approximated by the
@@ -35,7 +36,9 @@ to restart the algorithm from where it left off (see the notes).}
 
 \item{right_only}{logical value indicating return only the right singular vectors
 (\code{TRUE}) or both sets of vectors (\code{FALSE}). The right_only option can be
-cheaper to compute and use much less memory when \code{nrow(A) >> ncol(A)}.}
+cheaper to compute and use much less memory when \code{nrow(A) >> ncol(A)} but note
+that \code{right_only = TRUE} sets \code{fastpath = FALSE} (only use this option
+for really large problems that run out of memory).}
 
 \item{verbose}{logical value that when \code{TRUE} prints status messages during the computation.}
 
@@ -55,7 +58,7 @@ column of \code{A}; must be as long as the number of columns of \code{A} and may
 
 \item{mult}{optional custom matrix multiplication function (default is \code{\%*\%}, see notes).}
 
-\item{fastpath}{try a fast C algorithm implementation if possible; set \code{fastpath=FALSE} to use the reference R implementation.}
+\item{fastpath}{try a fast C algorithm implementation if possible; set \code{fastpath=FALSE} to use the reference R implementation. See notes.}
 }
 \value{
 Returns a list with entries:
@@ -112,10 +115,13 @@ product functions.
 Specify an optional alternative matrix multiplication operator in the
 \code{mult} parameter. \code{mult} must be a function of two arguments,
 and must handle both cases where one argument is a vector and the other
-a matrix. See the examples.
+a matrix. See the examples and
+\code{demo("custom_matrix_multiply", package="irlba")} for an 
+alternative approach.
 
 Use the \code{v} option to supply a starting vector for the iterative
-method. A random vector is used by default. Optionally set \code{v} to
+method. A random vector is used by default (precede with \code{set.seed()} to
+for reproducibility). Optionally set \code{v} to
 the output of a previous run of \code{irlba} to restart the method, adding
 additional singular values/vectors without recomputing the solution
 subspace. See the examples.
@@ -136,6 +142,10 @@ The function may generate the following warnings:
 }
 The function might return an error for several reasons including a situation when the starting
 vector \code{v} is near the null space of the matrix. In that case, try a different \code{v}.
+
+The \code{fastpath=TRUE} option only supports real-valued matrices and sparse matrices
+of type \code{dgCMatrix} (for now). Other problems fall back to the reference
+R implementation.
 }
 \examples{
 set.seed(1)

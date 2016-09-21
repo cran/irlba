@@ -2,8 +2,8 @@ Package: irlba
 Type: Package
 Title: Fast Truncated SVD, PCA and Symmetric Eigendecomposition for
         Large Dense and Sparse Matrices
-Version: 2.1.1
-Date: 2016-08-26
+Version: 2.1.2
+Date: 2016-09-20
 Authors@R: c(
     person("Jim", "Baglama", rol=c("aut", "cph"), email="jbaglama@uri.edu"),
     person("Lothar", "Reichel", role=c("aut", "cph"), email="reichel@math.kent.edu"),
@@ -18,10 +18,10 @@ License: GPL-3
 BugReports: https://github.com/bwlewis/irlba/issues
 RoxygenNote: 5.0.0
 NeedsCompilation: yes
-Packaged: 2016-08-27 12:01:34 UTC; blewis
+Packaged: 2016-09-21 13:57:09 UTC; blewis
 Author: Jim Baglama [aut, cph],
   Lothar Reichel [aut, cph],
   B. W. Lewis [aut, cre, cph]
 Maintainer: B. W. Lewis <blewis@illposed.net>
 Repository: CRAN
-Date/Publication: 2016-08-27 18:22:58
+Date/Publication: 2016-09-21 19:27:40
