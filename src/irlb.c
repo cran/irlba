@@ -61,7 +61,8 @@ RNORM (int n)
   return ans;
 }
 
-/* irlb C implementation wrapper
+/* irlb C implementation wrapper for R
+ *
  * X double precision input matrix
  * NU integer number of singular values/vectors to compute must be > 3
  * INIT double precision starting vector length(INIT) must equal ncol(X)
@@ -76,6 +77,7 @@ RNORM (int n)
  * SCALE either NULL (no scaling) or a vector of length ncol(X)
  * SHIFT either NULL (no shift) or a single double-precision number
  * CENTER either NULL (no centering) or a vector of length ncol(X)
+ * SVTOL double tolerance max allowed per cent change in each estimated singular value
  *
  * Returns a list with 6 elements:
  * 1. vector of estimated singular values
@@ -88,26 +90,27 @@ RNORM (int n)
 SEXP
 IRLB (SEXP X, SEXP NU, SEXP INIT, SEXP WORK, SEXP MAXIT, SEXP TOL, SEXP EPS,
       SEXP MULT, SEXP RESTART, SEXP RV, SEXP RW, SEXP RS, SEXP SCALE,
-      SEXP SHIFT, SEXP CENTER)
+      SEXP SHIFT, SEXP CENTER, SEXP SVTOL)
 {
   SEXP ANS, S, U, V;
   double *V1, *U1, *W, *F, *B, *BU, *BV, *BS, *BW, *res, *T, *scale, *shift,
-    *center;
+    *center, *SVRATIO;
   int i, iter, mprod, ret;
   R_xlen_t m, n;
 
   int mult = INTEGER (MULT)[0];
-  void *A;
+  void *AS = NULL;
+  double *A = NULL;
   switch (mult)
     {
     case 1:
-      A = (void *) AS_CHM_SP (X);
+      AS = (void *) AS_CHM_SP (X);
       int *dims = INTEGER (GET_SLOT (X, install ("Dim")));
       m = dims[0];
       n = dims[1];
       break;
     default:
-      A = (void *) REAL (X);
+      A = REAL (X);
       m = nrows (X);
       n = ncols (X);
     }
@@ -115,6 +118,7 @@ IRLB (SEXP X, SEXP NU, SEXP INIT, SEXP WORK, SEXP MAXIT, SEXP TOL, SEXP EPS,
   R_xlen_t work = INTEGER (WORK)[0];
   int maxit = INTEGER (MAXIT)[0];
   double tol = REAL (TOL)[0];
+  double svtol = REAL (SVTOL)[0];
   int lwork = 7 * work * (1 + work);
   int restart = INTEGER (RESTART)[0];
   double eps = REAL (EPS)[0];
@@ -144,6 +148,7 @@ IRLB (SEXP X, SEXP NU, SEXP INIT, SEXP WORK, SEXP MAXIT, SEXP TOL, SEXP EPS,
     {
       center = REAL (CENTER);
     }
+  SVRATIO = (double *) R_alloc (work, sizeof (double));
   V1 = (double *) R_alloc (n * work, sizeof (double));
   U1 = (double *) R_alloc (m * work, sizeof (double));
   W = (double *) R_alloc (m * work, sizeof (double));
@@ -164,9 +169,9 @@ IRLB (SEXP X, SEXP NU, SEXP INIT, SEXP WORK, SEXP MAXIT, SEXP TOL, SEXP EPS,
         B[i + work * i] = REAL (RS)[i];
     }
   ret =
-    irlb (A, mult, m, n, nu, work, maxit, restart, tol, scale, shift, center,
+    irlb (A, AS, mult, m, n, nu, work, maxit, restart, tol, scale, shift, center,
           REAL (S), REAL (U), REAL (V), &iter, &mprod, eps, lwork, V1, U1, W,
-          F, B, BU, BV, BS, BW, res, T);
+          F, B, BU, BV, BS, BW, res, T, svtol, SVRATIO);
   SET_VECTOR_ELT (ANS, 0, S);
   SET_VECTOR_ELT (ANS, 1, U);
   SET_VECTOR_ELT (ANS, 2, V);
@@ -188,8 +193,9 @@ IRLB (SEXP X, SEXP NU, SEXP INIT, SEXP WORK, SEXP MAXIT, SEXP TOL, SEXP EPS,
  * all data must be allocated by caller, required sizes listed below
  */
 int
-irlb (void *A,                  // Input data matrix
-      int mult,                 // 0 -> A is double *, 1 -> A is cholmod
+irlb (double *A,                // Input data matrix (double case)
+      void * AS,                // input data matrix (sparse case)
+      int mult,                 // 0 -> use double *A, 1 -> use AS
       int m,                    // data matrix number of rows, must be > 3.
       int n,                    // data matrix number of columns, must be > 3.
       int nu,                   // dimension of solution
@@ -201,7 +207,7 @@ irlb (void *A,                  // Input data matrix
       double *shift,            // optional shift (NULL for no shift)
       double *center,           // optional center (NULL for no center)
       // output values
-      double *s,                // output singular vectors at least length nu
+      double *s,                // output singular values at least length nu
       double *U,                // output left singular vectors  m x work
       double *V,                // output right singular vectors n x work
       int *ITER,                // ouput number of Lanczos iterations
@@ -218,7 +224,9 @@ irlb (void *A,                  // Input data matrix
       double *BS,               // work
       double *BW,               // lwork
       double *res,              // work
-      double *T)                // lwork
+      double *T,                // lwork
+      double svtol,             // svtol limit
+      double *svratio)          // convtest extra storage vector of length work
 {
   double d, S, R, alpha, beta, R_F, SS;
   double *x;
@@ -266,7 +274,7 @@ irlb (void *A,                  // Input data matrix
       switch (mult)
         {
         case 1:
-          dsdmult ('n', m, n, (CHM_SP) A, x, W + j * m);
+          dsdmult ('n', m, n, AS, x, W + j * m);
           break;
         default:
           alpha = 1;
@@ -307,7 +315,7 @@ irlb (void *A,                  // Input data matrix
           switch (mult)
             {
             case 1:
-              dsdmult ('t', m, n, (CHM_SP) A, W + j * m, F);
+              dsdmult ('t', m, n, AS, W + j * m, F);
               break;
             default:
               alpha = 1.0;
@@ -363,7 +371,7 @@ irlb (void *A,                  // Input data matrix
               switch (mult)
                 {
                 case 1:
-                  dsdmult ('n', m, n, (CHM_SP) A, x, W + (j + 1) * m);
+                  dsdmult ('n', m, n, AS, x, W + (j + 1) * m);
                   break;
                 default:
                   alpha = 1.0;
@@ -428,19 +436,25 @@ irlb (void *A,                  // Input data matrix
 /* Force termination after encountering linear dependence */
       if (R_F < 2 * eps)
         R_F = 0;
+
       Smax = 0;
       for (jj = 0; jj < j; ++jj)
-        if (BS[jj] > Smax)
-          Smax = BS[jj];
+        {
+          if (BS[jj] > Smax)
+            Smax = BS[jj];
+          svratio[jj] = fabs (svratio[jj] - BS[jj]) / BS[jj];
+        }
       for (kk = 0; kk < j; ++kk)
         res[kk] = R_F * BU[kk * work + (j - 1)];
 /* Update k to be the number of converged singular values. */
-      convtests (j, nu, tol, Smax, res, &k, &converged);
+      convtests (j, nu, tol, svtol, Smax, svratio, res, &k, &converged, S);
       if (converged == 1)
         {
           iter++;
           break;
         }
+      for (jj = 0; jj < j; ++jj)
+        svratio[jj] = BS[jj];
 
       alpha = 1;
       beta = 0;
@@ -493,14 +507,21 @@ irlba_R_cholmod_error (int status, const char *file, int line,
     warning ("Cholmod warning '%s' at file:%s, line %d", message, file, line);
 }
 
+static const R_CallMethodDef CallEntries[] = {
+  {"IRLB", (DL_FUNC) & IRLB, 16},
+  {NULL, NULL, 0}
+};
+
 #ifdef HAVE_VISIBILITY_ATTRIBUTE
 __attribute__ ((visibility ("default")))
 #endif
-     void R_init_irlba (DllInfo * dll)
+void
+R_init_irlba (DllInfo * dll)
 {
+  R_registerRoutines (dll, NULL, CallEntries, NULL, NULL);
+  R_useDynamicSymbols (dll, 0);
   M_R_cholmod_start (&chol_c);
   chol_c.final_ll = 1;          /* LL' form of simplicial factorization */
-
   /* need own error handler, that resets  final_ll (after *_defaults()) : */
   chol_c.error_handler = irlba_R_cholmod_error;
 }
@@ -513,7 +534,7 @@ R_unload_irlba (DllInfo * dll)
 
 
 void
-dsdmult (char transpose, int m, int n, void *a, double *b, double *c)
+dsdmult (char transpose, int m, int n, void * a, double *b, double *c)
 {
   DL_FUNC sdmult = R_GetCCallable ("Matrix", "cholmod_sdmult");
   int t = transpose == 't' ? 1 : 0;
@@ -539,8 +560,6 @@ dsdmult (char transpose, int m, int n, void *a, double *b, double *c)
   chc.x = (void *) c;
   chc.z = (void *) NULL;
 
-  double one[] = { 1, 0 }, zero[] =
-  {
-  0, 0};
+  double one[] = { 1, 0 }, zero[] = { 0, 0};
   sdmult (cha, t, one, zero, &chb, &chc, &chol_c);
 }

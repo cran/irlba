@@ -11,11 +11,14 @@ void
 convtests (int Bsz,           // Number of rows of bidiagonal matrix B
            int n,             // requested number of singular values
            double tol,        // convergence tolerance
+           double svtol,      // max change each singular value tolerane
            double Smax,       // largest singular value of B
+           double *svratio,   // vector of relative singular value ratio compared to last iteration
            double *residuals, // vector of residual values
            int *k,            // number of estimated singular values (INPUT)
                               // adjusted subspace size (OUTPUT)
-           int *converged);   // 0 = FALSE, 1 = TRUE
+           int *converged,    // 0 = FALSE, 1 = TRUE
+           double S);         // If S == 0 then invariant subspace found.
 
 /*
  * Simple cholmod double-precision sparse matrix times dense vector multiplication interface
@@ -31,10 +34,11 @@ dsdmult(char transpose, // 't' -> op(a) = t(a), non-transposed a otherwise
         double *b,      // double precision dense vector
         double *c);     // output
 
-/* IRLB method for sparse or dense double-precision valued matrices */
+/* IRLB function for sparse or dense double-precision valued matrices */
 int
-irlb(void *A,       // Input data matrix
-     int mult,      // 0->A is double *, 1-> A is sparse double *
+irlb(double *A,     // input data matrix (dense case)
+     void *AS,      // input data matrix (sparse case)
+     int mult,      // 0 -> A is double *, 1-> A is sparse double *
      int m,         // data matrix number of rows
      int n,         // data matrix number of columns
      int nu,        // dimension of solution
@@ -62,4 +66,6 @@ irlb(void *A,       // Input data matrix
      double *BS,    // working storage  work
      double *BW,    // working storage  lwork * lwork
      double *res,   // working storage  work
-     double *T);    // working storage lwork
+     double *T,     // working storage lwork
+     double svtol,  // svtol tolerance on maximum ratio change per singular value per iteration
+     double *SVRATIO);  // working storage nu

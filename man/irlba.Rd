@@ -2,12 +2,13 @@
 % Please edit documentation in R/irlba.R
 \name{irlba}
 \alias{irlba}
-\title{Find a few approximate largest singular values and corresponding
+\title{Find a few approximate singular values and corresponding
 singular vectors of a matrix.}
 \usage{
-irlba(A, nv = 5, nu, maxit = 1000, work = nv + 7, reorth = TRUE,
-  tol = 1e-05, v = NULL, right_only = FALSE, verbose = FALSE, scale,
-  center, du, ds, dv, shift, mult, fastpath = TRUE)
+irlba(A, nv = 5, nu = nv, maxit = 100, work = nv + 7, reorth = TRUE,
+  tol = 1e-05, v = NULL, right_only = FALSE, verbose = FALSE,
+  scale = NULL, center = NULL, shift = NULL, mult = NULL,
+  fastpath = TRUE, svtol = tol, smallest = FALSE, ...)
 }
 \arguments{
 \item{A}{numeric real- or complex-valued matrix or real-valued sparse matrix.}
@@ -22,10 +23,12 @@ irlba(A, nv = 5, nu, maxit = 1000, work = nv + 7, reorth = TRUE,
 
 \item{reorth}{if \code{TRUE}, apply full reorthogonalization to both SVD bases, otherwise
 only apply reorthogonalization to the right SVD basis vectors; the latter case is cheaper per
-iteration but, overall, may require more iterations for convergence. Always set to \code{TRUE}
+iteration but, overall, may require more iterations for convergence. Automatically \code{TRUE}
 when \code{fastpath=TRUE} (see below).}
 
-\item{tol}{convergence is determined when \eqn{\|AV - US\| < tol\|A\|}{||AV - US|| < tol*||A||},
+\item{tol}{convergence is determined when \eqn{\|A^TU - VS\| < tol\|A\|}{||A^T U - VS|| < tol*||A||},
+and when the maximum relative change in estimated singular values from one iteration to the
+next is less than \code{svtol = tol} (see \code{svtol} below),
 where the spectral norm ||A|| is approximated by the
 largest estimated singular value, and U, V, S are the matrices corresponding
 to the estimated left and right singular vectors, and diagonal matrix of
@@ -38,7 +41,7 @@ to restart the algorithm from where it left off (see the notes).}
 (\code{TRUE}) or both sets of vectors (\code{FALSE}). The right_only option can be
 cheaper to compute and use much less memory when \code{nrow(A) >> ncol(A)} but note
 that \code{right_only = TRUE} sets \code{fastpath = FALSE} (only use this option
-for really large problems that run out of memory).}
+for really large problems that run out of memory and when \code{nrow(A) >> ncol(A)}).}
 
 \item{verbose}{logical value that when \code{TRUE} prints status messages during the computation.}
 
@@ -46,19 +49,29 @@ for really large problems that run out of memory).}
 must be as long as the number of columns of \code{A} (see notes).}
 
 \item{center}{optional column centering vector whose values are subtracted from each
-column of \code{A}; must be as long as the number of columns of \code{A} and may}
-
-\item{du}{DEPRECATED optional subspace deflation vector (see notes).}
-
-\item{ds}{DEPRECATED optional subspace deflation scalar (see notes).}
-
-\item{dv}{DEPRECATED optional subspace deflation vector (see notes).}
+column of \code{A}; must be as long as the number of columns of \code{A} and may
+not be used together with the deflation options below (see notes).}
 
 \item{shift}{optional shift value (square matrices only, see notes).}
 
-\item{mult}{optional custom matrix multiplication function (default is \code{\%*\%}, see notes).}
+\item{mult}{DEPRECATED optional custom matrix multiplication function (default is \code{\%*\%}, see notes).}
 
-\item{fastpath}{try a fast C algorithm implementation if possible; set \code{fastpath=FALSE} to use the reference R implementation. See notes.}
+\item{fastpath}{try a fast C algorithm implementation if possible; set \code{fastpath=FALSE} to use the
+reference R implementation. See the notes for more details.}
+
+\item{svtol}{additional stopping tolerance on maximum allowed absolute relative change across each
+estimated singular value between iterations.
+The default value of this parameter is to set it to \code{tol}. You can set \code{svtol=Inf} to
+effectively disable this stopping criterion. Setting \code{svtol=Inf} allows the method to
+terminate on the first Lanczos iteration if it finds an invariant subspace, but with less certainty
+that the converged subspace is the desired one. (It may, for instance, miss some of the largest
+singular values in difficult problems.)}
+
+\item{smallest}{set \code{smallest=TRUE} to estimate the smallest singular values and associated
+singular vectors. WARNING: this option is somewhat experimental, and may produce poor
+estimates for ill-conditioned matrices.}
+
+\item{...}{optional additional arguments used to support experimental and deprecated features.}
 }
 \value{
 Returns a list with entries:
@@ -72,7 +85,8 @@ Returns a list with entries:
 }
 \description{
 The augmented implicitly restarted Lanczos bidiagonalization algorithm
-(IRLBA) finds a few approximate largest singular values and corresponding
+(IRLBA) finds a few approximate largest (or, optionally, smallest) singular
+values and corresponding
 singular vectors of a sparse or dense matrix using a method of Baglama and
 Reichel.  It is a fast and memory-efficient way to compute a partial SVD.
 }
@@ -94,33 +108,25 @@ to the number of columns of \code{A}.
 Use the optional \code{center} parameter to implicitly subtract the values
 in the \code{center} vector from each column of \code{A}, computing the
 truncated SVD of \code{sweep(A, 2, center, FUN=`-`)},
-without explicitly forming the centered matrix. This option may not be
-used together with the general rank 1 deflation options. \code{center}
+without explicitly forming the centered matrix. \code{center}
 must be a vector of length equal to the number of columns of \code{A}.
 This option may be used to efficiently compute principal components without
 explicitly forming the centered matrix (which can, importantly, preserve
 sparsity in the matrix). See the examples.
 
-The optional deflation parameters are deprecated and will be removed in
-a future version. They could be used to compute the rank-one deflated
-SVD of \eqn{A - ds \cdot du dv^T}{A - ds*du \%*\% t(dv)}, where
-\eqn{du^T A - ds\cdot dv^T = 0}{t(du) \%*\% A - ds * t(dv) == 0}. For
-example, the triple \code{ds, du, dv} may be a known singular value
-and corresponding singular vectors. Or \code{ds=m} and \code{dv}
-and \code{du} represent a vector of column means of \code{A} and of ones,
-respectively, where \code{m} is the number of rows of \code{A}.
-This functionality can be effectively replaced with custom matrix
-product functions.
+The optional \code{shift} scalar valued argument applies only to square matrices; use it
+to estimate the partial svd of \code{A + diag(shift, nrow(A), nrow(A))}
+(without explicitly forming the shifted matrix).
 
-Specify an optional alternative matrix multiplication operator in the
+(Deprecated) Specify an optional alternative matrix multiplication operator in the
 \code{mult} parameter. \code{mult} must be a function of two arguments,
 and must handle both cases where one argument is a vector and the other
-a matrix. See the examples and
-\code{demo("custom_matrix_multiply", package="irlba")} for an 
-alternative approach.
+a matrix. This option is deprecated and will be removed in a future version.
+The new preferred method simply uses R itself to define a custom matrix class
+with your user-defined matrix multiplication operator. See the examples.
 
 Use the \code{v} option to supply a starting vector for the iterative
-method. A random vector is used by default (precede with \code{set.seed()} to
+method. A random vector is used by default (precede with \code{set.seed()}
 for reproducibility). Optionally set \code{v} to
 the output of a previous run of \code{irlba} to restart the method, adding
 additional singular values/vectors without recomputing the solution
@@ -161,6 +167,12 @@ svd(A)$d[1:3]
 # (starting with an existing solution S)
 S1 <- irlba(A, 5, v=S)
 
+# Estimate smallest singular values
+irlba(A, 3, smallest=TRUE)$d
+
+#Compare with
+tail(svd(A)$d, 3)
+
 # Principal components (see also prcomp_irlba)
 P <- irlba(A, nv=1, center=colMeans(A))
 
@@ -171,6 +183,7 @@ cbind(P$v,
 
 # A custom matrix multiplication function that scales the columns of A
 # (cf the scale option). This function scales the columns of A to unit norm.
+# This approach is deprecated (see below for a bettwe way to do this).
 col_scale <- sqrt(apply(A, 2, crossprod))
 mult <- function(x, y)
         {
@@ -185,16 +198,22 @@ mult <- function(x, y)
 irlba(A, 3, mult=mult)$d
 
 # Compare with:
-irlba(A, 3, scale=col_scale)$d
-
-# Compare with:
 svd(sweep(A, 2, col_scale, FUN=`/`))$d[1:3]
+
+# Compare with the new recommended approach:
+setClass("scaled_matrix", contains="matrix", slots=c(scale="numeric"))
+setMethod("\%*\%", signature(x="scaled_matrix", y="numeric"),
+   function(x ,y) x@.Data \%*\% (y / x@scale))
+setMethod("\%*\%", signature(x="numeric", y="scaled_matrix"),
+   function(x ,y) (x \%*\% y@.Data) / y@scale)
+a <- new("scaled_matrix", A, scale=col_scale)
+irlba(a, 3)$d
 
 }
 \references{
 Augmented Implicitly Restarted Lanczos Bidiagonalization Methods, J. Baglama and L. Reichel, SIAM J. Sci. Comput. 2005.
 }
 \seealso{
-\code{\link{svd}}, \code{\link{prcomp}}, \code{\link{partial_eigen}}
+\code{\link{svd}}, \code{\link{prcomp}}, \code{\link{partial_eigen}}, \code{\link{svdr}}
 }
 
