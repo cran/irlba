@@ -5,14 +5,18 @@
 \title{Find a few approximate largest singular values and corresponding
 singular vectors of a matrix.}
 \usage{
-svdr(x, k, it = 3, extra = 10, center = NULL, Q = NULL)
+svdr(x, k, tol = 1e-05, it = 100L, extra = min(10L, dim(x) - k),
+  center = NULL, Q = NULL, return.Q = FALSE)
 }
 \arguments{
 \item{x}{numeric real- or complex-valued matrix or real-valued sparse matrix.}
 
 \item{k}{dimension of subspace to estimate (number of approximate singular values to compute).}
 
-\item{it}{fixed number of algorithm iterations, larger values improve accuracy.}
+\item{tol}{stop iteration when the largest absolute relative change in estimated singular
+values from one iteration to the next falls below this value.}
+
+\item{it}{maximum number of algorithm iterations.}
 
 \item{extra}{number of extra vectors of dimension \code{ncol(x)}, larger values generally improve accuracy (with increased
 computational cost).}
@@ -24,6 +28,8 @@ Use for efficient principal components computation.}
 
 \item{Q}{optional initial random matrix, defaults to a matrix of size \code{ncol(x)} by \code{k + extra} with
 entries sampled from a normal random distribution.}
+
+\item{return.Q}{if \code{TRUE} return the \code{Q} matrix for restarting (see examples).}
 }
 \value{
 Returns a list with entries:
@@ -31,7 +37,8 @@ Returns a list with entries:
   \item{d:}{ k approximate singular values}
   \item{u:}{ k approximate left singular vectors}
   \item{v:}{ k approximate right singular vectors}
-  \item{mprod:}{ The total number of matrix vector products carried out}
+  \item{mprod:}{ total number of matrix products carried out}
+  \item{Q:}{ optional subspace matrix (when \code{return.Q=TRUE})}
 }
 }
 \description{
@@ -44,6 +51,10 @@ is a block method and may produce more accurate estimations with
 less work for problems with clustered large singular values (see
 the examples). In other problems, \code{irlba} may exhibit faster
 convergence.
+}
+\details{
+Also see an alternate implementation (\code{rsvd}) of this method by N. Benjamin Erichson
+in the https://cran.r-project.org/package=rsvd package.
 }
 \examples{
 set.seed(1)
@@ -98,6 +109,5 @@ Finding structure with randomness: Stochastic algorithms for constructing
 approximate matrix decompositions N. Halko, P. G. Martinsson, J. Tropp. Sep. 2009.
 }
 \seealso{
-\code{\link{irlba}}, \code{\link{svd}}
+\code{\link{irlba}}, \code{\link{svd}}, \code{rsvd} in the rsvd package
 }
-

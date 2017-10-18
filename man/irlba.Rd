@@ -134,10 +134,11 @@ subspace. See the examples.
 
 The function may generate the following warnings:
 \itemize{
-  \item{"did not converge--results might be invalid!; try increasing maxit or fastpath=FALSE" means that the algorithm didn't
+  \item{"did not converge--results might be invalid!; try increasing work or maxit"
+  means that the algorithm didn't
   converge -- this is potentially a serious problem and the returned results may not be valid. \code{irlba}
   reports a warning here instead of an error so that you can inspect whatever is returned. If this
-  happens, carefully heed the warning and inspect the result.}
+  happens, carefully heed the warning and inspect the result. You may also try setting \code{fastpath=FALSE}.}
   \item{"You're computing a large percentage of total singular values, standard svd might work better!"
     \code{irlba} is designed to efficiently compute a few of the largest singular values and associated
      singular vectors of a matrix. The standard \code{svd} function will be more efficient for computing
@@ -183,24 +184,7 @@ cbind(P$v,
 
 # A custom matrix multiplication function that scales the columns of A
 # (cf the scale option). This function scales the columns of A to unit norm.
-# This approach is deprecated (see below for a bettwe way to do this).
 col_scale <- sqrt(apply(A, 2, crossprod))
-mult <- function(x, y)
-        {
-          # check if x is a  vector
-          if (is.vector(x))
-          {
-            return((x \%*\% y) / col_scale)
-          }
-          # else x is the matrix
-          x \%*\% (y / col_scale)
-        }
-irlba(A, 3, mult=mult)$d
-
-# Compare with:
-svd(sweep(A, 2, col_scale, FUN=`/`))$d[1:3]
-
-# Compare with the new recommended approach:
 setClass("scaled_matrix", contains="matrix", slots=c(scale="numeric"))
 setMethod("\%*\%", signature(x="scaled_matrix", y="numeric"),
    function(x ,y) x@.Data \%*\% (y / x@scale))
@@ -209,11 +193,14 @@ setMethod("\%*\%", signature(x="numeric", y="scaled_matrix"),
 a <- new("scaled_matrix", A, scale=col_scale)
 irlba(a, 3)$d
 
+# Compare with:
+svd(sweep(A, 2, col_scale, FUN=`/`))$d[1:3]
+
+
 }
 \references{
-Augmented Implicitly Restarted Lanczos Bidiagonalization Methods, J. Baglama and L. Reichel, SIAM J. Sci. Comput. 2005.
+Baglama, James, and Lothar Reichel. "Augmented implicitly restarted Lanczos bidiagonalization methods." SIAM Journal on Scientific Computing 27.1 (2005): 19-42.
 }
 \seealso{
 \code{\link{svd}}, \code{\link{prcomp}}, \code{\link{partial_eigen}}, \code{\link{svdr}}
 }
-

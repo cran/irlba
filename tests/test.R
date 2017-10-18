@@ -115,15 +115,6 @@ for (FAST in c(FALSE, TRUE))
     stop("Failed reorthogonalization test", " fastpath=", FAST)
   }
 
-  # prcomp convenience function
-  x  <- matrix(rnorm(200), nrow=20)
-  p1 <- prcomp_irlba(x, n=3, fastpath=FAST)
-  p2 <- prcomp(x, tol=0.7)
-  if (!isTRUE(all.equal(p1$sdev[1:2], p2$sdev[1:2])))
-  {
-    stop("Failed prcomp test", " fastpath=", FAST)
-  }
-
   # very non-square dense matrices
   set.seed(1)
   A <- matrix(rnorm(2000), 20)
@@ -160,6 +151,31 @@ for (FAST in c(FALSE, TRUE))
   if (isTRUE(max(abs(l$d - 1)) > 1e-3))
   {
     stop("Failed tprolate test fastpath=", FAST)
+  }
+
+  # test for issue #7 and issue #14
+  mx <- matrix(sample(1:100, 100 * 100, replace=TRUE), nrow=100)
+  set.seed(1)
+  l <- irlba(mx, nv=30, center=colMeans(mx), fastpath=FAST)
+  s <- svd(scale(mx, center=TRUE, scale=FALSE))
+  if (isTRUE(max(abs(l$d - s$d[1:30])) > 1e-3))
+  {
+    stop("Failed integer matrix test fastpath=", FAST)
+  }
+
+  # test for https://github.com/bwlewis/irlba/issues/22
+  set.seed(1000)
+  ncells <- 50
+  ngenes <- 1000
+  counts <- matrix(as.double(rpois(ncells*ngenes, lambda=100)), nrow=ncells)
+  centers <- colMeans(counts)
+  set.seed(1)
+  out <- irlba(scale(counts, scale=FALSE, center=centers), nu=10, nv=10)
+  set.seed(1)
+  l <- irlba(counts, center=centers, nu=10, nv=10, fastpath=FAST)
+  if (isTRUE(max(abs(out$d - l$d)) > 1e-3))
+  {
+    stop("Failed centering test (n > m) fastpath=", FAST)
   }
 }
 

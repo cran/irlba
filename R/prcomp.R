@@ -13,6 +13,15 @@
 #'          scaled to have unit variance before the analysis takes place.
 #'          The default is \code{FALSE} for consistency with S, but scaling is often advisable.
 #'          Alternatively, a vector of length equal the number of columns of \code{x} can be supplied.
+#'
+#'          The value of \code{scale} determines how column scaling is performed
+#'          (after centering).  If \code{scale} is a numeric vector with length
+#'          equal to the number of columns of \code{x}, then each column of \code{x} is
+#'          divided by the corresponding value from \code{scale}.  If \code{scale} is
+#'          \code{TRUE} then scaling is done by dividing the (centered) columns of
+#'          \code{x} by their standard deviations if \code{center=TRUE}, and the
+#'          root mean square otherwise.  If \code{scale} is \code{FALSE}, no scaling is done.
+#'          See \code{\link{scale}} for more details.
 #' @param n integer number of principal component vectors to return, must be less than
 #' \code{min(dim(x))}.
 #' @param ... additional arguments passed to \code{\link{irlba}}.
@@ -56,9 +65,10 @@
 #' p2 <- prcomp(x, tol=0.7)
 #' summary(p2)
 #'
+#'
 #' @seealso \code{\link{prcomp}}
 #' @import Matrix
-#' @importFrom stats rnorm prcomp sd
+#' @importFrom stats rnorm prcomp sd var
 #' @importFrom methods slotNames slot
 #' @export
 prcomp_irlba <- function(x, n = 3, retx = TRUE, center = TRUE, scale. = FALSE, ...)
@@ -77,7 +87,15 @@ control that algorithm's convergence tolerance. See `?prcomp_irlba` for help.")
   } else args$center <- center
   if (is.logical(scale.))
   {
-    if (scale.) args$scale <- apply(x, 2, sd)
+    if (scale.)
+    {
+      if (is.numeric(args$center))
+      {
+        f <- function(i) sqrt(sum((x[, i] - center[i]) ^ 2) / (nrow(x) - 1L))
+        scale. <- vapply(seq(ncol(x)), f, pi, USE.NAMES=FALSE)
+      } else scale. <- apply(x, 2L, function(v) sqrt(sum(v ^ 2) / max(1, length(v) - 1L)))
+      args$scale <- scale.
+    }
   } else args$scale <- scale.
   if (!missing(...)) args <- c(args, list(...))
 
@@ -91,6 +109,27 @@ control that algorithm's convergence tolerance. See `?prcomp_irlba` for help.")
     ans <- c(ans, list(x = sweep(s$u, 2, s$d, FUN=`*`)))
     colnames(ans$x) <- paste("PC", seq(1, ncol(ans$rotation)), sep="")
   }
-  class(ans) <- "prcomp"
+  ans$totalvar <- sum(apply(x, 2, var))
+  class(ans) <- c("irlba_prcomp", "prcomp")
   ans
+}
+
+#' Summary method for truncated pca objects computed by \code{prcomp_irlba}.
+#' @param object An object returned by \code{prcomp_irlba}.
+#' @param ... Optional arguments passed to \code{summary}.
+#' @method summary irlba_prcomp
+#' @export
+summary.irlba_prcomp <- function(object, ...)
+{
+  chkDots(...)
+  vars <- object$sdev ^ 2
+  vars <- vars / object$totalvar
+  importance <- rbind("Standard deviation" = object$sdev,
+                      "Proportion of Variance" = round(vars, 5),
+                      "Cumulative Proportion" = round(cumsum(vars), 5))
+  k <- ncol(object$rotation)
+  colnames(importance) <- c(colnames(object$rotation), rep("", length(vars) - k))
+  object$importance <- importance
+  class(object) <- "summary.prcomp"
+  object
 }

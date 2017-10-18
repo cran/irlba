@@ -96,7 +96,7 @@ IRLB (SEXP X, SEXP NU, SEXP INIT, SEXP WORK, SEXP MAXIT, SEXP TOL, SEXP EPS,
   double *V1, *U1, *W, *F, *B, *BU, *BV, *BS, *BW, *res, *T, *scale, *shift,
     *center, *SVRATIO;
   int i, iter, mprod, ret;
-  R_xlen_t m, n;
+  int m, n;
 
   int mult = INTEGER (MULT)[0];
   void *AS = NULL;
@@ -115,7 +115,7 @@ IRLB (SEXP X, SEXP NU, SEXP INIT, SEXP WORK, SEXP MAXIT, SEXP TOL, SEXP EPS,
       n = ncols (X);
     }
   int nu = INTEGER (NU)[0];
-  R_xlen_t work = INTEGER (WORK)[0];
+  int work = INTEGER (WORK)[0];
   int maxit = INTEGER (MAXIT)[0];
   double tol = REAL (TOL)[0];
   double svtol = REAL (SVTOL)[0];
@@ -194,7 +194,7 @@ IRLB (SEXP X, SEXP NU, SEXP INIT, SEXP WORK, SEXP MAXIT, SEXP TOL, SEXP EPS,
  */
 int
 irlb (double *A,                // Input data matrix (double case)
-      void * AS,                // input data matrix (sparse case)
+      void *AS,                 // input data matrix (sparse case)
       int mult,                 // 0 -> use double *A, 1 -> use AS
       int m,                    // data matrix number of rows, must be > 3.
       int n,                    // data matrix number of columns, must be > 3.
@@ -245,6 +245,8 @@ irlb (double *A,                // Input data matrix (double case)
 
   if (restart == 0)
     memset (B, 0, work * work * sizeof (double));
+  memset(svratio, 0, work * sizeof(double));
+
 /* Main iteration */
   while (iter < maxit)
     {
@@ -325,9 +327,10 @@ irlb (double *A,                // Input data matrix (double case)
             }
           mprod++;
           R_CheckUserInterrupt ();
-/* optionally apply shift and scale */
+/* optionally apply shift, scale, center */
           if (shift)
             {
+              // Note, not a bug because shift only applies to square matrices
               for (kk = 0; kk < m; ++kk)
                 F[kk] = F[kk] + shift[0] * W[j * m + kk];
             }
@@ -335,6 +338,13 @@ irlb (double *A,                // Input data matrix (double case)
             {
               for (kk = 0; kk < n; ++kk)
                 F[kk] = F[kk] / scale[kk];
+            }
+          if (center)
+            {
+              beta = 0;
+              for (kk = 0; kk < m; ++kk) beta += W[j *m + kk];
+              for (kk = 0; kk < n; ++kk)
+                F[kk] = F[kk] - beta * center[kk]; // XXX XXX XXX
             }
           SS = -S;
           F77_NAME (daxpy) (&n, &SS, V + j * n, &inc, F, &inc);

@@ -106,10 +106,11 @@
 #'
 #' The function may generate the following warnings:
 #' \itemize{
-#'   \item{"did not converge--results might be invalid!; try increasing maxit or fastpath=FALSE" means that the algorithm didn't
+#'   \item{"did not converge--results might be invalid!; try increasing work or maxit"
+#'   means that the algorithm didn't
 #'   converge -- this is potentially a serious problem and the returned results may not be valid. \code{irlba}
 #'   reports a warning here instead of an error so that you can inspect whatever is returned. If this
-#'   happens, carefully heed the warning and inspect the result.}
+#'   happens, carefully heed the warning and inspect the result. You may also try setting \code{fastpath=FALSE}.}
 #'   \item{"You're computing a large percentage of total singular values, standard svd might work better!"
 #'     \code{irlba} is designed to efficiently compute a few of the largest singular values and associated
 #'      singular vectors of a matrix. The standard \code{svd} function will be more efficient for computing
@@ -126,7 +127,7 @@
 #' R implementation.
 #'
 #' @references
-#' Augmented Implicitly Restarted Lanczos Bidiagonalization Methods, J. Baglama and L. Reichel, SIAM J. Sci. Comput. 2005.
+#' Baglama, James, and Lothar Reichel. "Augmented implicitly restarted Lanczos bidiagonalization methods." SIAM Journal on Scientific Computing 27.1 (2005): 19-42.
 #'
 #' @examples
 #' set.seed(1)
@@ -158,24 +159,7 @@
 #'
 #' # A custom matrix multiplication function that scales the columns of A
 #' # (cf the scale option). This function scales the columns of A to unit norm.
-#' # This approach is deprecated (see below for a bettwe way to do this).
 #' col_scale <- sqrt(apply(A, 2, crossprod))
-#' mult <- function(x, y)
-#'         {
-#'           # check if x is a  vector
-#'           if (is.vector(x))
-#'           {
-#'             return((x %*% y) / col_scale)
-#'           }
-#'           # else x is the matrix
-#'           x %*% (y / col_scale)
-#'         }
-#' irlba(A, 3, mult=mult)$d
-#'
-#' # Compare with:
-#' svd(sweep(A, 2, col_scale, FUN=`/`))$d[1:3]
-#'
-#' # Compare with the new recommended approach:
 #' setClass("scaled_matrix", contains="matrix", slots=c(scale="numeric"))
 #' setMethod("%*%", signature(x="scaled_matrix", y="numeric"),
 #'    function(x ,y) x@.Data %*% (y / x@scale))
@@ -183,6 +167,10 @@
 #'    function(x ,y) (x %*% y@.Data) / y@scale)
 #' a <- new("scaled_matrix", A, scale=col_scale)
 #' irlba(a, 3)$d
+#'
+#' # Compare with:
+#' svd(sweep(A, 2, col_scale, FUN=`/`))$d[1:3]
+#'
 #'
 #' @seealso \code{\link{svd}}, \code{\link{prcomp}}, \code{\link{partial_eigen}}, \code{\link{svdr}}
 #' @import Matrix
@@ -221,26 +209,31 @@ function(A,                     # data matrix
   mcall <- as.list(match.call())
   # Maximum number of Ritz vectors to use in augmentation, may be less
   # depending on workspace size.
-  maxritz <- mcall[["maxritz"]]
+  maxritz <- mcall[["maxritz"]] # experimental
   if (is.null(maxritz)) maxritz <- 3
-  du <- mcall[["du"]]
-  dv <- mcall[["dv"]]
-  ds <- mcall[["ds"]]
+  du <- mcall[["du"]] # deprecated
+  dv <- mcall[["dv"]] # deprecated
+  ds <- mcall[["ds"]] # deprecated
   deflate <- is.null(du) + is.null(ds) + is.null(dv)
-  if (smallest) fastpath <- FALSE
+  if (is.logical(scale) && ! scale) scale <- NULL
+  if (is.logical(shift) && ! shift) shift <- NULL
+  if (is.logical(center) && ! center) center <- NULL
+  if (smallest) fastpath <- FALSE  # for now anyway
+  if (any(dim(A) > 2 ^ 32 - 1)) fastpath <- FALSE # for now
   if (deflate == 3)
   {
     deflate <- FALSE
   } else if (deflate == 0)
   {
     deflate <- TRUE
-    warning("The deflation options are deprecated and have been removed as formal arugments. Please modify your code to not use them.")
+    warning("The deflation options have been deprecated. Please modify your code to not use them.")
     if (length(ds) > 1) stop("deflation limited to one dimension")
     if (!is.null(dim(du))) du <- du[, 1]
     if (!is.null(dim(dv))) dv <- dv[, 1]
   } else stop("all three du ds dv parameters must be specified for deflation")
   if (!is.null(center))
   {
+    if (is.logical(center) && center) center <- colMeans(A)
     if (deflate) stop("the center parameter can't be specified together with deflation parameters")
     if (length(center) != ncol(A)) stop("center must be a vector of length ncol(A)")
     if (fastpath && ! right_only) du <- NULL
@@ -249,6 +242,7 @@ function(A,                     # data matrix
     dv <- center
     deflate <- TRUE
   }
+  if ("integer" == typeof(A)) A <- A + 0.0
   iscomplex <- is.complex(A)
   m <- nrow(A)
   n <- ncol(A)
@@ -285,7 +279,8 @@ function(A,                     # data matrix
   if (right_only)
   {
     w_dim <- 1
-    work <- min(min(m, n), work + 20) # typically need this to help convergence
+    # typically need to increase working dimensions to help convergence
+    if (! ("work" %in% names(as.list(match.call())))) work <- min(min(m, n), work + 20)
     fastpath <- FALSE
   }
   if (n > m && smallest)
@@ -334,7 +329,8 @@ function(A,                     # data matrix
     if (is.null(v))
     {
       v <- rnorm(n)
-      if (verbose) message("Initializing starting vector v with samples from standard normal distribution.\nUse `set.seed` first for reproducibility.")
+      if (verbose) message("Initializing starting vector v with samples from standard normal distribution.
+Use `set.seed` first for reproducibility.")
     } else if (is.list(v))  # restarted case
     {
       if (is.null(v$v) || is.null(v$d) || is.null(v$u)) stop("restart requires left and right singular vectors")
@@ -355,7 +351,7 @@ function(A,                     # data matrix
     CENTER <- NULL
     if (!is.null(scale))
     {
-      if (length(scale) != ncol(A)) stop("scale length must mactch number of matrix columns")
+      if (length(scale) != ncol(A)) stop("scale length must match number of matrix columns")
       SCALE <- as.double(scale)
     }
     if (!is.null(shift))
@@ -377,7 +373,7 @@ function(A,                     # data matrix
       ans$u <- matrix(head(ans$u, m * nu), nrow=m, ncol=nu)
       ans$v <- matrix(head(ans$v, n * nv), nrow=n, ncol=nv)
       if (tol * ans$d[1] < eps) warning("convergence criterion below machine epsilon")
-      if (ans[[6]] == -2) warning("did not converge--results might be invlaid!; try increasing maxit or fastpath=FALSE")
+      if (ans[[6]] == -2) warning("did not converge--results might be invlaid!; try increasing work or maxit")
       return(ans[-6])
     }
     errors <- c("invalid dimensions",
@@ -534,9 +530,10 @@ function(A,                     # data matrix
         if (interchange) F <- t(drop(mult(A, drop(W[, j_w]))))
         else F <- t(drop(mult(drop(W[, j_w]), A)))
       }
-#     Optionally apply shift and scale
+#     Optionally apply shift, scale, deflate
       if (!is.null(shift)) F <- F + shift * W[, j_w]
       if (!is.null(scale)) F <- F / scale
+      if (deflate) F <- F - sum(W[, j_w]) * dv
       mprod <- mprod + 1
       F <- drop(F - S * V[, j])
 #     Orthogonalize
