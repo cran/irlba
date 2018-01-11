@@ -181,7 +181,7 @@
 irlba <-
 function(A,                     # data matrix
          nv=5, nu=nv,           # number of singular vectors to estimate
-         maxit=100,             # maximum number of iterations
+         maxit=1000,            # maximum number of iterations
          work=nv + 7,           # working subspace size
          reorth=TRUE,           # TRUE=full reorthogonalization
          tol=1e-5,              # stopping tolerance
@@ -195,13 +195,15 @@ function(A,                     # data matrix
          fastpath=TRUE,         # use the faster C implementation if possible
          svtol=tol,             # stopping tolerance percent change in estimated svs
          smallest=FALSE,        # set to TRUE to estimate subspaces associated w/smallest singular values
-         ...)                   # optional arguments (really just to support old removed args)
+         ...)                   # optional experimental or deprecated arguments
 {
 # ---------------------------------------------------------------------
 # Check input parameters
 # ---------------------------------------------------------------------
   ropts <- options(warn=1) # immediately show warnings
-  on.exit(options(ropts))  # reset on exit
+  mflag <- new.env()
+  mflag$flag <- FALSE
+  on.exit(options(ropts))
   interchange <- FALSE
   eps <- .Machine$double.eps
   # hidden support for old, removed (previously deprecated) parameters
@@ -209,11 +211,13 @@ function(A,                     # data matrix
   mcall <- as.list(match.call())
   # Maximum number of Ritz vectors to use in augmentation, may be less
   # depending on workspace size.
-  maxritz <- mcall[["maxritz"]] # experimental
+  maxritz <- eval(mcall[["maxritz"]]) # experimental
   if (is.null(maxritz)) maxritz <- 3
-  du <- mcall[["du"]] # deprecated
-  dv <- mcall[["dv"]] # deprecated
-  ds <- mcall[["ds"]] # deprecated
+  eps2 <- eval(mcall[["invariant_subspace_tolerance"]])
+  if (is.null(eps2)) eps2 <- eps ^ (4 / 5)
+  du <- eval(mcall[["du"]]) # deprecated
+  dv <- eval(mcall[["dv"]]) # deprecated
+  ds <- eval(mcall[["ds"]]) # deprecated
   deflate <- is.null(du) + is.null(ds) + is.null(dv)
   if (is.logical(scale) && ! scale) scale <- NULL
   if (is.logical(shift) && ! shift) shift <- NULL
@@ -365,7 +369,7 @@ Use `set.seed` first for reproducibility.")
       CENTER <- as.double(center)
     }
     ans <- .Call(C_IRLB, A, as.integer(k), as.double(v), as.integer(work),
-                 as.integer(maxit), as.double(tol), as.double(.Machine$double.eps), as.integer(SP),
+                 as.integer(maxit), as.double(tol), as.double(eps2), as.integer(SP),
                  as.integer(RESTART), RV, RW, RS, SCALE, SHIFT, CENTER, as.double(svtol))
     if (ans[[6]] == 0 || ans[[6]] == -2)
     {
@@ -373,7 +377,7 @@ Use `set.seed` first for reproducibility.")
       ans$u <- matrix(head(ans$u, m * nu), nrow=m, ncol=nu)
       ans$v <- matrix(head(ans$v, n * nv), nrow=n, ncol=nv)
       if (tol * ans$d[1] < eps) warning("convergence criterion below machine epsilon")
-      if (ans[[6]] == -2) warning("did not converge--results might be invlaid!; try increasing work or maxit")
+      if (ans[[6]] == -2) warning("did not converge--results might be invalid!; try increasing work or maxit")
       return(ans[-6])
     }
     errors <- c("invalid dimensions",
@@ -420,7 +424,6 @@ Use `set.seed` first for reproducibility.")
   B <- NULL                  # Bidiagonal matrix
   Bsz <- NULL                # Size of B
   eps23 <- eps ^ (2 / 3)     # Used for Smax/avoids using zero
-  eps2 <- 2 * eps
   iter <- 1                  # Man loop iteration count
   mprod <- 0                 # Number of matrix-vector products
   R_F <- NULL                # 2-norm of residual vector F
@@ -508,7 +511,7 @@ Use `set.seed` first for reproducibility.")
     if (is.na(S) || S < eps2 && j == 1) stop("starting vector near the null space")
     if (is.na(S) || S < eps2)
     {
-      if (verbose) message("invariant subspace found")
+      if (verbose) message_once("invariant subspace found", flag=mflag)
       W[, j_w] <- rnorm(nrow(W))
       if (w_dim > 1) W[, j] <- orthog(W[, j], W[, 1:(j - 1)])
       W[, j_w] <- W[, j_w] / norm2(W[, j_w])
@@ -544,7 +547,7 @@ Use `set.seed` first for reproducibility.")
 #       Check for linear dependence
         if (R < eps2)
         {
-          if (verbose) message("invariant subspace found")
+          if (verbose) message_once("invariant subspace found", flag=mflag)
           F <- matrix(rnorm(dim(V)[1]), dim(V)[1], 1)
           F <- orthog(F, V[, 1:j, drop=FALSE])
           V[, j + 1] <- F / norm2(F)
@@ -590,7 +593,7 @@ Use `set.seed` first for reproducibility.")
 #       Check for linear dependence
         if (S < eps2)
         {
-          if (verbose) message("invariant subspace found")
+          if (verbose) message_once("invariant subspace found", flag=mflag)
           W[, jp1_w] <- rnorm(nrow(W))
           if (w_dim > 1) W[, j + 1] <- orthog(W[, j + 1], W[, 1:j])
           W[, jp1_w] <- W[, jp1_w] / norm2(W[, jp1_w])

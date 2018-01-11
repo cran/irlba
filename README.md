@@ -1,15 +1,15 @@
 # irlba
 
-Implicitly-restarted Lanczos methods for fast truncated singular value decomposition
-of sparse and dense matrices (also referred to as partial SVD).  IRLBA stands
-for Augmented, <b>I</b>mplicitly <b>R</b>estarted <b>L</b>anczos
+Implicitly-restarted Lanczos methods for fast truncated singular value
+decomposition of sparse and dense matrices (also referred to as partial SVD).
+IRLBA stands for Augmented, <b>I</b>mplicitly <b>R</b>estarted <b>L</b>anczos
 <b>B</b>idiagonalization <b>A</b>lgorithm. The package provides the following
 functions (see help on each for details and examples).
 
 * `irlba()` partial SVD function
-* `svdr()` alternate partial SVD function based on randomized SVD
-* `svds()` l1-penalized matrix decompoisition for sparse PCA (based on Shen and Huang's algorithm)
+* `ssvd()` l1-penalized matrix decompoisition for sparse PCA (based on Shen and Huang's algorithm)
 * `prcomp_irlba()`  principal components function similar to the `prcomp` function in stats package for computing the first few principal components of large matrices
+* `svdr()` alternate partial SVD function based on randomized SVD (see also the [rsvd](https://cran.r-project.org/package=rsvd) package by N. Benjamin Erichson for an alternative implementation)
 * `partial_eigen()` a very limited partial eigenvalue decomposition for symmetric matrices (see the [RSpectra](https://cran.r-project.org/package=RSpectra) package for more comprehensive truncated eigenvalue decomposition)
 
 Help documentation for each function includes extensive documentation and
@@ -17,16 +17,27 @@ examples. Also see the package vignette, `vignette("irlba", package="irlba")`.
 
 An overview web page is here: https://bwlewis.github.io/irlba/.
 
-## What's new in Version 2.3.0?
+## New in 2.3.2
+
+- Fixed a regression in `prcomp_irlba()` discovered by Xiaojie Qiu, see https://github.com/bwlewis/irlba/issues/25, and other related problems reported in https://github.com/bwlewis/irlba/issues/32.
+- Added rchk testing to pre-CRAN submission tests.
+- Fixed a sign bug in `ssvd()` found by Alex Poliakov.
+
+## What's new in Version 2.3.1?
 
 - Fixed an `irlba()` bug associated with centering (PCA), see https://github.com/bwlewis/irlba/issues/21.
 - Fixed `irlba()` scaling to conform to `scale`, see https://github.com/bwlewis/irlba/issues/22.
 - Improved `prcomp_irlba()` from a suggestion by N. Benjamin Erichson, see https://github.com/bwlewis/irlba/issues/23.
 - Significanty changed/improved `svdr()` convergence criterion.
 - Added a version of Shen and Huang's Sparse PCA/SVD L1-penalized matrix decomposition (`ssvd()`).
+- Fixed valgrind errors.
 
 
 ## Deprecated features
+
+I will remove `partial_eigen()` in a future version. As its documentation
+states, users are better off using the RSpectra package for eigenvalue
+computations (although not generally for singular value computations).
 
 The `mult` argument is deprecated and will be removed in a future version. We
 now recommend simply defining a custom class with a custom multiplcation
@@ -79,9 +90,8 @@ products for very large problems with amazingly little code.
 
 ## Wishlist / help wanted...
 
-- Optional block implementation for some use cases
 - More Matrix classes supported in the fast code path
-- Help improving the solver for smallest singular values in tricky cases (basically, for ill-conditioned problems)
+- Help improving the solver for singular values in tricky cases (basically, for ill-conditioned problems and especially for the smallest singular values); in general this may require a combination of more careful convergence criteria and use of harmonic Ritz values; Dmitriy Selivanov has proposed alternative convergence criteria in https://github.com/bwlewis/irlba/issues/29 for example.
 
 ## References
 

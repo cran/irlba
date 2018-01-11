@@ -52,7 +52,7 @@
 #' A list containing the following components:
 #' \itemize{
 #'    \item{u} {regularized left singular vectors with orthonormal columns}
-#'    \item{d} {regularized upper-triangluar projection matrix so that \code{x \%*\% v == u \%*\% d}} 
+#'    \item{d} {regularized upper-triangluar projection matrix so that \code{x \%*\% v == u \%*\% d}}
 #'    \item{v} {regularized, sparse right singular vectors with columns of unit norm}
 #'    \item{center, scale} {the centering and scaling used, if any}
 #'    \item{lambda} {the per-column regularization parameter found to obtain the desired sparsity}
@@ -142,6 +142,8 @@
 #' # last example, we know the exact number of nonzero elements in each
 #' # solution vector of the noise-free matrix. Note the application of
 #' # different sparsity constraints on each column of the estimated v.
+#' # Also, the decomposition is unique only up to sign, which we adjust
+#' # for below.
 #' set.seed(1)
 #' u <- qr.Q(qr(matrix(rnorm(400), ncol=2)))
 #' v <- matrix(0, ncol=2, nrow=300)
@@ -151,7 +153,9 @@
 #' x <- u %*% (c(2, 1) * t(v)) + .001 * matrix(rnorm(200 * 300), 200)
 #' s <- ssvd(x, k=2, n=colSums(v != 0))
 #'
-#' # Compare actual and estimated vectors:
+#' # Compare actual and estimated vectors (adjusting for sign):
+#' s$u <- sign(u) * abs(s$u)
+#' s$v <- sign(v) * abs(s$v)
 #' table(actual=v[, 1] != 0, estimated=s$v[, 1] != 0)
 #' table(actual=v[, 2] != 0, estimated=s$v[, 2] != 0)
 #' plot(v[, 1], cex=2, main="True v1 (black circles), Estimated v1 (blue discs)")
@@ -171,7 +175,7 @@ ssvd <- function(x, k=1, n=2, maxit=500, tol=1e-3, center=FALSE, scale.=FALSE, a
     {
       if (is.numeric(center))
       {
-        f <- function(i) sqrt(sum( (x[, i] - center[i]) ^ 2) / (nrow(x) - 1L))
+        f <- function(i) sqrt(sum((x[, i] - center[i]) ^ 2) / (nrow(x) - 1L))
         scale. <- vapply(seq(ncol(x)), f, pi, USE.NAMES=FALSE)
       } else scale. <- apply(x, 2L, function(v) sqrt(sum(v ^ 2) / max(1, length(v) - 1L)))
     }
@@ -205,9 +209,18 @@ ssvd <- function(x, k=1, n=2, maxit=500, tol=1e-3, center=FALSE, scale.=FALSE, a
     u <- s$u
     s$v <- soft(x, s$u, n)
     if (is.numeric(scale.)) s$v <- s$v / scale.
-    if (is.numeric(center)) s$u <- qr.Q(qr(x %*% s$v - drop(crossprod(center, s$v))))
-    else s$u <- qr.Q(qr(x %*% s$v))
-    delta_u <- sqrt(sum(apply(u - s$u, 2, crossprod)))
+    if (is.numeric(center))
+    {
+      xsv <- x %*% s$v - drop(crossprod(center, s$v))
+      s$u <- qr.Q(qr(xsv))
+    } else
+    {
+      xsv <- x %*% s$v
+      s$u <- qr.Q(qr(x %*% s$v))
+    }
+    # Maintain sign (possibly messed up by QR)
+    s$u <- sweep(s$u, 2, apply(xsv, 2, function(x) sign(head(x[x!=0], 1))) / apply(s$u, 2, function(x) sign(head(x[x!=0], 1))), `*`)
+    delta_u <- 1 - abs(crossprod(u, s$u))
     iter <- iter + 1
   }
   if (iter >= maxit)
