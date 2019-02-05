@@ -28,8 +28,10 @@
 #' @param right_only logical value indicating return only the right singular vectors
 #'  (\code{TRUE}) or both sets of vectors (\code{FALSE}). The right_only option can be
 #'  cheaper to compute and use much less memory when \code{nrow(A) >> ncol(A)} but note
-#'  that \code{right_only = TRUE} sets \code{fastpath = FALSE} (only use this option
+#'  that obtained solutions typically lose accuracy due to lack of re-orthogonalization in the
+#'  algorithm and that \code{right_only = TRUE} sets \code{fastpath = FALSE} (only use this option
 #'  for really large problems that run out of memory and when \code{nrow(A) >> ncol(A)}).
+#'  Consider increasing the \code{work} option to improve accuracy with \code{right_only=TRUE}.
 #' @param verbose logical value that when \code{TRUE} prints status messages during the computation.
 #' @param scale optional column scaling vector whose values divide each column of \code{A};
 #'   must be as long as the number of columns of \code{A} (see notes).
@@ -208,7 +210,10 @@ function(A,                     # data matrix
   eps <- .Machine$double.eps
   # hidden support for old, removed (previously deprecated) parameters
   # this is here as a convenience to keep old code working without change
+  # also supports experimental features not yet promoted to the api
   mcall <- as.list(match.call())
+  random <- eval(mcall[["rng"]])
+  if (is.null(random)) random <- rnorm # default RNG
   # Maximum number of Ritz vectors to use in augmentation, may be less
   # depending on workspace size.
   maxritz <- eval(mcall[["maxritz"]]) # experimental
@@ -268,7 +273,8 @@ function(A,                     # data matrix
   if (work <= 1) stop("work must be greater than 1")
   if (tol < 0) stop("tol must be non-negative")
   if (maxit <= 0) stop("maxit must be positive")
-  if (work <= k) work <- k + 1 # work must be strictly larger than requested subspace dimension
+  # work must be strictly larger than requested subspace dimension, except see right_only below
+  if (work <= k && ! right_only) work <- k + 1
   if (work >= min(n, m))
   {
     work <- min(n, m)
@@ -283,8 +289,6 @@ function(A,                     # data matrix
   if (right_only)
   {
     w_dim <- 1
-    # typically need to increase working dimensions to help convergence
-    if (! ("work" %in% names(as.list(match.call())))) work <- min(min(m, n), work + 20)
     fastpath <- FALSE
   }
   if (n > m && smallest)
@@ -304,8 +308,12 @@ function(A,                     # data matrix
 # Check for tiny problem, use standard SVD in that case. Make definition of 'tiny' larger?
   if (min(m, n) < 6)
   {
+    A <- as.matrix(A) # avoid need to define "+" and "/" for arbitrary matrix types.
     if (verbose) message("Tiny problem detected, using standard `svd` function.")
-    if (!is.null(scale)) A <- A / scale
+    if (!is.null(scale)) {
+      A <- sweep(A, 2, scale, "/")
+      dv <- dv / scale # scale the centering vector.
+    }
     if (!is.null(shift)) A <- A + diag(shift, nrow(A), ncol(A))
     if (deflate)
     {
@@ -332,7 +340,7 @@ function(A,                     # data matrix
     RV <- RW <- RS <- NULL
     if (is.null(v))
     {
-      v <- rnorm(n)
+      v <- random(n)
       if (verbose) message("Initializing starting vector v with samples from standard normal distribution.
 Use `set.seed` first for reproducibility.")
     } else if (is.list(v))  # restarted case
@@ -340,7 +348,7 @@ Use `set.seed` first for reproducibility.")
       if (is.null(v$v) || is.null(v$d) || is.null(v$u)) stop("restart requires left and right singular vectors")
       if (max(nu, nv) <= min(ncol(v$u), ncol(v$v))) return(v) # Nothing to do!
       RESTART <- as.integer(length(v$d))
-      RND <- rnorm(n)
+      RND <- random(n)
       RND <- orthog(RND, v$v)
       RV <- cbind(v$v, RND / norm2(RND))
       RW <- v$u
@@ -410,7 +418,7 @@ Use `set.seed` first for reproducibility.")
 # normally distributed random numbers.  In any case, allocate V appropriate to
 # problem size:
     V <- matrix(0.0, n, work)
-    V[, 1] <- rnorm(n)
+    V[, 1] <- random(n)
   } else
   {
 # user-supplied starting subspace
@@ -440,10 +448,13 @@ Use `set.seed` first for reproducibility.")
     B <- cbind(diag(d), 0)
     k <- length(d)
 
-    F <- rnorm(n)
+    F <- random(n)
     F <- orthog(F, V[, 1:k])
     V[, k + 1] <- F / norm2(F)
   }
+
+# Change du to be non-NULL, for non-fastpath'able matrices with non-NULL scale.
+  if (deflate && is.null(du)) du <- 1
 
 # ---------------------------------------------------------------------
 # Main iteration
@@ -479,13 +490,9 @@ Use `set.seed` first for reproducibility.")
     }
     if (interchange) avj <- mult(VJ, A)
     else avj <- mult(A, VJ)
-#   Handle sparse products.
-    if ("Matrix" %in% attributes(class(avj)) && "x" %in% slotNames(avj))
-    {
-      if (length(avj@x) == nrow(W)) avj <- slot(avj, "x")
-      else avj <- as.vector(avj)
-    }
-    W[, j_w] <- avj
+
+#   Handle non-ordinary arrays as products.
+    W[, j_w] <- as.vector(avj)
     mprod <- mprod + 1
 
 #   Optionally apply shift
@@ -512,7 +519,7 @@ Use `set.seed` first for reproducibility.")
     if (is.na(S) || S < eps2)
     {
       if (verbose) message_once("invariant subspace found", flag=mflag)
-      W[, j_w] <- rnorm(nrow(W))
+      W[, j_w] <- random(nrow(W))
       if (w_dim > 1) W[, j] <- orthog(W[, j], W[, 1:(j - 1)])
       W[, j_w] <- W[, j_w] / norm2(W[, j_w])
       S <- 0
@@ -536,7 +543,11 @@ Use `set.seed` first for reproducibility.")
 #     Optionally apply shift, scale, deflate
       if (!is.null(shift)) F <- F + shift * W[, j_w]
       if (!is.null(scale)) F <- F / scale
-      if (deflate) F <- F - sum(W[, j_w]) * dv
+      if (deflate) {
+        sub <- sum(W[, j_w]) * dv
+        if (!is.null(scale)) sub <- sub / scale
+        F <- F - sub
+      }
       mprod <- mprod + 1
       F <- drop(F - S * V[, j])
 #     Orthogonalize
@@ -548,7 +559,7 @@ Use `set.seed` first for reproducibility.")
         if (R < eps2)
         {
           if (verbose) message_once("invariant subspace found", flag=mflag)
-          F <- matrix(rnorm(dim(V)[1]), dim(V)[1], 1)
+          F <- matrix(random(dim(V)[1]), dim(V)[1], 1)
           F <- orthog(F, V[, 1:j, drop=FALSE])
           V[, j + 1] <- F / norm2(F)
           R <- 0
@@ -594,7 +605,7 @@ Use `set.seed` first for reproducibility.")
         if (S < eps2)
         {
           if (verbose) message_once("invariant subspace found", flag=mflag)
-          W[, jp1_w] <- rnorm(nrow(W))
+          W[, jp1_w] <- random(nrow(W))
           if (w_dim > 1) W[, j + 1] <- orthog(W[, j + 1], W[, 1:j])
           W[, jp1_w] <- W[, jp1_w] / norm2(W[, jp1_w])
           S <- 0

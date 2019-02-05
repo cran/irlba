@@ -95,7 +95,7 @@
 #' Although less general than \code{PMD}(*),
 #' the \code{ssvd} function can be faster and more memory efficient for the
 #' basic sparse PCA problem.
-#' See the examples below for more information.
+#' See \url{https://bwlewis.github.io/irlba/ssvd.html} for more information.
 #'
 #' (* Note that the s4vd package by Martin Sill and Sebastian Kaiser, \url{https://cran.r-project.org/package=s4vd},
 #' includes a fast optimized version of a closely related algorithm by Shen, Huang, and Marron, that penalizes
@@ -121,22 +121,6 @@
 #' points(s$u, pch=19, col=4)
 #' plot(v, cex=2, main="v (black circles), Estimated v (blue discs)")
 #' points(s$v, pch=19, col=4)
-#'
-#' # Compare with SPC from the PMA package, regularizing only the v vector and choosing
-#' # the regularization constraint `sum(abs(s$v))` computed above by ssvd
-#' # (they find the about same solution in this "sparse SVD" case):
-#' if (requireNamespace("PMA", quietly = TRUE)) {
-#'   p <- PMA::SPC(x, sumabsv=sum(abs(s$v)), center=FALSE)
-#'   table(actual=v[, 1] != 0, estimated=p$v[, 1] != 0)
-#'   # compare optimized values
-#'   print(c(ssvd=s$d, SPC=p$d))
-#'
-#'   # Same example, but computing a "sparse PCA", again about the same results:
-#'   sp <- ssvd(x, n=50, center=TRUE)
-#'   pp <- PMA::SPC(x, sumabsv=sum(abs(sp$v)), center=TRUE)
-#'   print(c(ssvd=sp$d, SPC=pp$d))
-#' }
-#'
 #'
 #' # Let's consider a trivial rank-2 example (k=2) with noise. Like the
 #' # last example, we know the exact number of nonzero elements in each
@@ -202,7 +186,7 @@ ssvd <- function(x, k=1, n=2, maxit=500, tol=1e-3, center=FALSE, scale.=FALSE, a
     sign(y) * pmax(sweep(a, 2, lambda, `-`), 0)
   }
   s$v <- s$d * s$v
-  iter <- 1
+  iter <- 0
   delta_u <- Inf
   while (delta_u > tol && iter < maxit)
   {
@@ -216,11 +200,11 @@ ssvd <- function(x, k=1, n=2, maxit=500, tol=1e-3, center=FALSE, scale.=FALSE, a
     } else
     {
       xsv <- x %*% s$v
-      s$u <- qr.Q(qr(x %*% s$v))
+      s$u <- qr.Q(qr(xsv))
     }
     # Maintain sign (possibly messed up by QR)
     s$u <- sweep(s$u, 2, apply(xsv, 2, function(x) sign(head(x[x!=0], 1))) / apply(s$u, 2, function(x) sign(head(x[x!=0], 1))), `*`)
-    delta_u <- 1 - abs(crossprod(u, s$u))
+    delta_u <- max(1 - diag(abs(crossprod(u, s$u))))
     iter <- iter + 1
   }
   if (iter >= maxit)

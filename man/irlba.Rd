@@ -40,8 +40,10 @@ to restart the algorithm from where it left off (see the notes).}
 \item{right_only}{logical value indicating return only the right singular vectors
 (\code{TRUE}) or both sets of vectors (\code{FALSE}). The right_only option can be
 cheaper to compute and use much less memory when \code{nrow(A) >> ncol(A)} but note
-that \code{right_only = TRUE} sets \code{fastpath = FALSE} (only use this option
-for really large problems that run out of memory and when \code{nrow(A) >> ncol(A)}).}
+that obtained solutions typically lose accuracy due to lack of re-orthogonalization in the
+algorithm and that \code{right_only = TRUE} sets \code{fastpath = FALSE} (only use this option
+for really large problems that run out of memory and when \code{nrow(A) >> ncol(A)}).
+Consider increasing the \code{work} option to improve accuracy with \code{right_only=TRUE}.}
 
 \item{verbose}{logical value that when \code{TRUE} prints status messages during the computation.}
 
@@ -204,3 +206,4 @@ Baglama, James, and Lothar Reichel. "Augmented implicitly restarted Lanczos bidi
 \seealso{
 \code{\link{svd}}, \code{\link{prcomp}}, \code{\link{partial_eigen}}, \code{\link{svdr}}
 }
+
