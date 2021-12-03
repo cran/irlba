@@ -1,4 +1,4 @@
-ab06b18d4797acaea821cf962ab30bb4 *DESCRIPTION
+0814be2dabb8418e54efb0f38e6943f4 *DESCRIPTION
 1f29b808f13eaa1ff708a79059d02dbf *NAMESPACE
 00ec66520f5b307bfd8238441f1703fe *R/eigen.R
 0c60d68f766a2f251ee7392bb12ad485 *R/irlba.R
@@ -6,10 +6,11 @@ ab06b18d4797acaea821cf962ab30bb4 *DESCRIPTION
 b409b6faa3a27b65826adad184dc255c *R/ssvd.R
 139e756a8467cc9a33c0fe0914ede41e *R/svdr.R
 59e1470ca8e2c4bf5672d2a44d1fa04d *R/utility.R
-c031002850f67cb46f4b6745431edc25 *README
-4458ef601faa1bc56319e79d6f464c4d *build/vignette.rds
+bcbc0d8ee0ec09bdfd3c35cdf04fe1fd *README
+43df6eee2280a38271f8b4bc1d49f540 *README.md
+163e38ea3ecdccb1305feddb05e54fb1 *build/vignette.rds
 ffcb4c3e143d951b9c1a8dffe6267a06 *inst/doc/irlba.Rnw
-48297bfb0fcae8cf4f1500444467ff99 *inst/doc/irlba.pdf
+4e85c655087c00f651b69b98bb812630 *inst/doc/irlba.pdf
 bb47bd3377e2d5e17ea77b7ba616cf89 *man/irlba.Rd
 1ad1f26493f3b039251517a411b7ccca *man/partial_eigen.Rd
 e993145444a4b431fbe21ca4fbcb1797 *man/prcomp_irlba.Rd
@@ -17,7 +18,7 @@ e993145444a4b431fbe21ca4fbcb1797 *man/prcomp_irlba.Rd
 0178ba7102496ab5c94d631cd6cd487a *man/summary.irlba_prcomp.Rd
 9ffaabd60c8037f9c4f6662730c7a679 *man/svdr.Rd
 619d13ce6900fca2139e2139408d39ad *src/Makevars
-b4c4d5d3e380142f7f14b63a40b90414 *src/irlb.c
+2ab287e5d35e50bdaee3e8bcddcc70a0 *src/irlb.c
 c3060f4abbe417e55fbed6f15af4ca62 *src/irlb.h
 6ac0ec445043f9d95da2059598a94ae1 *src/utility.c
 5d15f8c507375f5caaa07e94d3dd72e7 *tests/edge.R
