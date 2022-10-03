@@ -1,4 +1,4 @@
-4cd5aa5e757cda3735a806e3cf589c86 *DESCRIPTION
+0d731892a736b9ecb6e6c21c6582787a *DESCRIPTION
 1f29b808f13eaa1ff708a79059d02dbf *NAMESPACE
 00ec66520f5b307bfd8238441f1703fe *R/eigen.R
 0c60d68f766a2f251ee7392bb12ad485 *R/irlba.R
@@ -17,7 +17,7 @@ e993145444a4b431fbe21ca4fbcb1797 *man/prcomp_irlba.Rd
 0178ba7102496ab5c94d631cd6cd487a *man/summary.irlba_prcomp.Rd
 9ffaabd60c8037f9c4f6662730c7a679 *man/svdr.Rd
 619d13ce6900fca2139e2139408d39ad *src/Makevars
-5beccd1d59c51eaab5e826389c92bcec *src/irlb.c
+b8d27a2b889586072f34afd2c341681e *src/irlb.c
 c3060f4abbe417e55fbed6f15af4ca62 *src/irlb.h
 8666c6ba17647deb393f3f749a265edf *src/utility.c
 5d15f8c507375f5caaa07e94d3dd72e7 *tests/edge.R
