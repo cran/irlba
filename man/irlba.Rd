@@ -5,10 +5,26 @@
 \title{Find a few approximate singular values and corresponding
 singular vectors of a matrix.}
 \usage{
-irlba(A, nv = 5, nu = nv, maxit = 1000, work = nv + 7, reorth = TRUE,
-  tol = 1e-05, v = NULL, right_only = FALSE, verbose = FALSE,
-  scale = NULL, center = NULL, shift = NULL, mult = NULL,
-  fastpath = TRUE, svtol = tol, smallest = FALSE, ...)
+irlba(
+  A,
+  nv = 5,
+  nu = nv,
+  maxit = 1000,
+  work = nv + 7,
+  reorth = TRUE,
+  tol = 1e-05,
+  v = NULL,
+  right_only = FALSE,
+  verbose = FALSE,
+  scale = NULL,
+  center = NULL,
+  shift = NULL,
+  mult = NULL,
+  fastpath = TRUE,
+  svtol = tol,
+  smallest = FALSE,
+  ...
+)
 }
 \arguments{
 \item{A}{numeric real- or complex-valued matrix or real-valued sparse matrix.}
@@ -206,4 +222,3 @@ Baglama, James, and Lothar Reichel. "Augmented implicitly restarted Lanczos bidi
 \seealso{
 \code{\link{svd}}, \code{\link{prcomp}}, \code{\link{partial_eigen}}, \code{\link{svdr}}
 }
-
